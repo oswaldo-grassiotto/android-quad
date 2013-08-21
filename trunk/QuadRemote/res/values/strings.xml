@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Quadcóptero</string>
+    <string name="action_settings">Configurações</string>
+    <string name="aguardando">Aguardando Conexão</string>
+    <string name="botaoFoto">Foto</string>
+    <string name="botaoVideo">Video</string>
+    <string name="NoText"/>
+    <string name="menu_settings">Configurações</string>
+
+</resources>
