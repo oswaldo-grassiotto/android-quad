@@ -1,9 +1,8 @@
 <resources>
 
-    <string name="app_name">Quadcóptero</string>
-    <string name="hello_world">Hello world!</string>
-    <string name="menu_settings">Configurações</string>
-    <string name="title_activity_main">Quadcóptero</string>
-    <string name="Status">aguardando conexão</string>
+    <string name="app_name">Quadcopter</string>
+    <string name="menu_settings">Settings</string>
+    <string name="title_activity_main">Quadcopter</string>
+    <string name="Status">awaiting connection</string>
 
 </resources>

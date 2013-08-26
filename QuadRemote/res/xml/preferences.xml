@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <CheckBoxPreference
+        android:key="prefVideoEnabled"
+        android:title="@string/pref_video_enabled"
+        android:summary="@string/pref_video_enabled_summ"
+        android:defaultValue="true" />
+    <ListPreference
+        android:dependency="prefVideoEnabled"
+        android:key="prefSupportedResolutions"
+        android:title="@string/pref_supported_resolutions"
+        android:dialogTitle="@string/pref_supported_resolutions"
+        android:defaultValue="@string/default_resolution" />
+</PreferenceScreen>

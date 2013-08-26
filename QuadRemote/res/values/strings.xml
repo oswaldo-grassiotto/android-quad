@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <string name="app_name">Quadcóptero</string>
-    <string name="action_settings">Configurações</string>
-    <string name="aguardando">Aguardando Conexão</string>
-    <string name="botaoFoto">Foto</string>
+    <string name="app_name">Quadcopter</string>
+    <string name="awaiting">awaiting connection</string>
+    <string name="botaoFoto">Picture</string>
     <string name="botaoVideo">Video</string>
     <string name="NoText"/>
-    <string name="menu_settings">Configurações</string>
+    <string name="menu_settings">Settings</string>
+    <string name="pref_video_enabled">FPV Flight</string>
+    <string name="pref_video_enabled_summ">Enables video from the onboard camera</string>
+    <string name="default_resolution">320x240</string>
+    <string name="pref_supported_resolutions">Supported Resolutions</string>
+    <string name="no_controller">No controller found. Please connect to your quad in order to get a list of available resolutions.</string>
 
 </resources>
