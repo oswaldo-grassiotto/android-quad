@@ -1,18 +1,16 @@
 package br.com.quadremote;
 
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.StrictMode;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CompoundButton;
@@ -22,17 +20,11 @@ import android.widget.TextView;
 import android.widget.ToggleButton;
 
 public class QuadRemote extends Activity {
-
-	//Networking variables
-	public static final int SERVERPORT = 6775;
-	public static final String SERVERIP = "192.168.43.201";
-	public static final String CLIENTIP = "192.168.43.1";
-	public static DatagramSocket socket;
-	public InetAddress serverAddress;
-	static SendCommandThread sendCommand;
+	
+	static SendCommandThread sendCommandThread;
 	
 	//User interface variables
-	private TextView mTextview;
+	private static TextView mTextview;
 	private ImageView iv;
 	static Joystick joy1;
 	static Joystick joy2;
@@ -44,14 +36,14 @@ public class QuadRemote extends Activity {
 	Bitmap image;
 	
 	//Messaging variable
-	private Handler handler = new Handler();
+	private static Handler handler = new Handler();
 
 	/** Called when the activity is first created. */
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.main);
-
+		
 		//Retrieve and store UI elements for later usage
 		mTextview = (TextView) findViewById(R.id.textView1);
 		iv = (ImageView) findViewById(R.id.imageView1);
@@ -61,17 +53,12 @@ public class QuadRemote extends Activity {
 		videoButton = (ToggleButton) findViewById(R.id.videoButton);
 		videoTimer = (TextView) findViewById(R.id.videoTimer);
 		
-		try {
-			serverAddress = InetAddress.getByName(SERVERIP);
-		} catch (UnknownHostException e1) {
-			Log.e("Client Startup", e1.getMessage());
-		}
-		
 		//Create listeners for the buttons
 		picButton.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
 				//take picture command
-				sendCommand(1);
+				Log.d("Remote Main", "Sending command 4");
+				sendCommand(4);
 			}
 		});
 
@@ -88,31 +75,26 @@ public class QuadRemote extends Activity {
 			}
 		});
 		
-		StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
-		StrictMode.setThreadPolicy(policy);
-		
 		try {
-			createSocket();
-		} catch (SocketException e) {
-			e.printStackTrace();
+			//Run new thread to receive video frames via UDP socket
+			ReceiveVideoThread receiveVideo = new ReceiveVideoThread(handler, iv);
+			receiveVideo.start();
+		} catch (SocketException e1) {
+			e1.printStackTrace();
 		}
 		
-		//Run new thread to receive video frames via UDP socket
-		Thread receiveVideo = new Thread(new ReceiveVideoThread());
-		receiveVideo.start();
-		
-		sendCommand = new SendCommandThread(serverAddress, SERVERPORT, socket);
-		sendCommand.start();
-	}
-	
-	/**
-	 * Creates a new UDP socket connection if one doesn't already exist
-	 * 
-	 * @throws SocketException
-	 */
-	private synchronized void createSocket() throws SocketException{
-		if(socket == null)
-			socket = new DatagramSocket(SERVERPORT);
+		try {
+			sendCommandThread = new SendCommandThread();
+			sendCommandThread.start();
+			
+			//Now that we've started the thread we ask the controller 
+			//for the available resolutions
+			sendCommand(4);
+		} catch (SocketException e) {
+			e.printStackTrace();
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+		}
 	}
 
 	/**
@@ -134,6 +116,7 @@ public class QuadRemote extends Activity {
 			case 1:
 			case 2:
 			case 3:
+			case 4:
 				commandBytes[0] = (byte) command;
 				break;
 			default:
@@ -148,90 +131,40 @@ public class QuadRemote extends Activity {
 				commandBytes[4] = (byte) y2;
 		}
 		
-		sendCommand.setCommandBytes(commandBytes);
+		sendCommandThread.setCommandBytes(commandBytes);
 	}
 	
-	/**
-	 * Video Receiver Thread
-	 * 
-	 * Constantly reads data from the socket. Reads the header and attempts
-	 * to assemble a frame from multiple packets then display it.
-	 */
-	class ReceiveVideoThread implements Runnable {
-
-		private int current_frame = 0;
-		private int slicesStored = 0;
-		private final int DATA_MAX_SIZE = 491;
-		private final int HEADER_SIZE = 5;
-		private byte[] imageData;
-		
-		public void run() {
-			
-			try {
-				createSocket();
-			} catch (SocketException e1) {
-				Log.e("Video Receiver Connection", e1.getMessage());
+	public static void updateTextView(final String newMessage){
+		handler.post(new Runnable() {
+			@Override
+			public void run() {
+				mTextview.setText(newMessage);
 			}
-			
-			while (true) {	
-				handler.post(new Runnable() {
-					@Override
-					public void run() {
-						mTextview.setText("IP: " + CLIENTIP);
-					}
-				});
-					
-				try {		
-					//Attempt to receive video packet
-					DatagramPacket packet = null;
-					byte[] receivedData = new byte[496];
-					packet = new DatagramPacket(receivedData, 496);
-					socket.receive(packet);
-					
-					byte[] data = packet.getData();         
-		            
-					//Read header data
-					int frame_nb = (int)data[0];
-		            int nb_packets = (int)data[1];
-		            int packet_nb = (int)data[2];
-		            int size_packet = (int) ((data[3] & 0xff) << HEADER_SIZE | (data[4] & 0xff));
-		            
-		            //If we're starting to receive a new frame
-		            if((packet_nb==0) && (current_frame != frame_nb)) {
-		                
-		            	current_frame = frame_nb;
-		                slicesStored = 0;
-		                //Log.d("Client Frame Assembly", "Creating new buffer for frame " + frame_nb + ", size is " + (nb_packets * DATA_MAX_SIZE) + " bytes");
-		                imageData = new byte[nb_packets * DATA_MAX_SIZE];
-		                
-		            } 
-		            
-		            if(frame_nb == current_frame) {
-		            	//Else we got another piece of the frame we're currently assembling
-		            	
-		            	System.arraycopy(data, HEADER_SIZE, imageData, (packet_nb * DATA_MAX_SIZE), size_packet);
-		            	
-		            	slicesStored++;             
-		            }
-
-		            /* If the frame is complete display it */
-		            if (slicesStored == nb_packets) {
-		            	image = BitmapFactory.decodeByteArray(imageData, 0, imageData.length);
-						handler.post(new Runnable() {
-							@Override
-							public void run() {
-								try{
-									iv.setImageBitmap(image);
-								}catch(Exception e){
-									Log.e("Video Receiver Display", e.getMessage());
-								}
-							}
-						});
-		            }
-	            } catch (Exception e) {
-	                Log.e("Video Receiver", e.getMessage());
-	            }               
-			}
-		}
+		});
 	}
+	
+	@Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.settings, menu);
+        return true;
+    }
+ 
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+ 
+        case R.id.menu_settings:
+            Intent i = new Intent(this, SettingsActivity.class);
+            startActivityForResult(i, 1);
+            break;
+ 
+        }
+ 
+        return true;
+    }
+    
+    public static void setSupportedResolutions(String resolutionsStr){
+    	CharSequence[] resolutions = resolutionsStr.split(",");
+    	SettingsActivity.resolutions = resolutions;
+    }
 }
