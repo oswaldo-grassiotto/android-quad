@@ -14,14 +14,17 @@ import android.util.Log;
  * Constantly tries to send a command trough the assigned server via UDP Socket
  */
 public class SendCommandThread extends Thread {
-
-	private final InetAddress SERVER_ADDRESS;
-	private final int SERVER_PORT = 6774;
 	
 	private byte[] commandBytes;
 	private DatagramSocket socket;
 	
-	public SendCommandThread() throws SocketException, UnknownHostException{
+	private final InetAddress SERVER_ADDRESS;
+	private final int SERVER_PORT = 6774;
+	private final QuadRemote MAIN_ACTIVITY;
+	
+	public SendCommandThread(QuadRemote mainActivity) throws SocketException, UnknownHostException{
+		this.MAIN_ACTIVITY = mainActivity;
+		
 		this.SERVER_ADDRESS = InetAddress.getByName("192.168.43.201");
 		this.socket = new DatagramSocket(SERVER_PORT);
 	}
@@ -47,7 +50,7 @@ public class SendCommandThread extends Thread {
 						resolutionsData = resolutionsPacket.getData();
 						String resolutionsStr = new String(resolutionsData, "UTF-8").trim();
 						Log.d("Command Sender", "Data received: " + resolutionsStr);
-						QuadRemote.setSupportedResolutions(resolutionsStr);
+						MAIN_ACTIVITY.setSupportedResolutions(resolutionsStr);
 					}
 					
 					commandBytes = null;

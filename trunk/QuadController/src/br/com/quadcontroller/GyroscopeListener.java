@@ -6,6 +6,12 @@ import android.hardware.SensorEventListener;
 
 public class GyroscopeListener implements SensorEventListener {
 	
+	private final QuadController MAIN_ACTIVITY;
+	
+	public GyroscopeListener(QuadController mainActivity){
+		this.MAIN_ACTIVITY = mainActivity;
+	}
+	
 	@Override
 	public void onAccuracyChanged(Sensor sensor, int accuracy) {
 		// TODO Auto-generated method stub
@@ -19,10 +25,6 @@ public class GyroscopeListener implements SensorEventListener {
 		float y = event.values[1];
 		float z = event.values[2];
 		
-		QuadController.gyroX = x;
-		QuadController.gyroY = y;
-		QuadController.gyroZ = z;
-		
-		//QuadController.gyroField.setText("Gyroscope x: " + x + " y: " + y + " z: " + z);
+		MAIN_ACTIVITY.setGyroValues(x, y, z);
 	}
 }

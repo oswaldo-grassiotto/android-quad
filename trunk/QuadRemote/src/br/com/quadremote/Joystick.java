@@ -11,20 +11,23 @@ import android.view.View;
   
 public class Joystick extends View {  
     
-	Point pontoFinal, pontoMeio = null;  
-    Paint paint;  
-    int larg = getWidth();  
-    int alt = getHeight();  
+	private Point pontoFinal, pontoMeio = null;  
+    private Paint paint;  
+    private int larg = getWidth();  
+    private int alt = getHeight();
+    
+    private final QuadRemote MAIN_ACTIVITY;
   
     public Joystick(Context context, AttributeSet attrs)  
     {  
         super(context, attrs);  
-          
-        pontoFinal = new Point(larg/2, alt/2);  
-          
-        iniciarPaint();  
-          
-        setarListener();  
+        
+        this.MAIN_ACTIVITY = (QuadRemote) context;
+        		
+        pontoFinal = new Point(larg/2, alt/2);
+        
+        iniciarPaint();
+        setarListener();
     }  
       
     public void iniciarPaint(){  
@@ -57,13 +60,13 @@ public class Joystick extends View {
                     pontoFinal.set((int) event.getX(), (int) event.getY());  
                     invalidate();
                     
-					QuadRemote.sendCommand(0);
+					MAIN_ACTIVITY.sendCommand(0);
                     
                 } else if(event.getAction() == MotionEvent.ACTION_UP){  
                     pontoFinal.set(pontoMeio.x, pontoMeio.y);  
                     invalidate();
                     
-					QuadRemote.sendCommand(0);
+                    MAIN_ACTIVITY.sendCommand(0);
                 }  
                 return true;  
             }  

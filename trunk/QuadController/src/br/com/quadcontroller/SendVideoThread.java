@@ -16,25 +16,25 @@ import android.util.Log;
  * 
  * @author walbao
  */
-public class SendVideoThread implements Runnable {
-
+public class SendVideoThread extends Thread {
+	
 	private final String TAG = "Video Sender";
 	
-	private final int DATAGRAM_MAX_SIZE = 491;
-	private final int HEADER_SIZE = 5;
 	private int frame_nb = 0;
 	private InetAddress clientAddress;
 	
-	private final String CLIENT_IP;
-	private final int VIDEO_PORT;
-	private final DatagramSocket socket;
+	private final int DATAGRAM_MAX_SIZE = 491;
+	private final int HEADER_SIZE = 5;
+	private final String CLIENT_IP = "192.168.43.1";
+	private final int VIDEO_PORT = 6775;
+	private final DatagramSocket SOCKET;
+	private final QuadController MAIN_ACTIVITY;
+	
 
-	public SendVideoThread() throws SocketException, UnknownHostException {
+	public SendVideoThread(QuadController mainActivity) throws SocketException, UnknownHostException {
+		this.MAIN_ACTIVITY = mainActivity;
 		
-		VIDEO_PORT = 6775;
-		CLIENT_IP = "192.168.43.1";
-		
-		this.socket = new DatagramSocket(VIDEO_PORT);
+		this.SOCKET = new DatagramSocket(VIDEO_PORT);
 		clientAddress = InetAddress.getByName(CLIENT_IP);
 	}
 	
@@ -42,10 +42,10 @@ public class SendVideoThread implements Runnable {
 		while (true) {
 			try {
 				byte[] imageBytes;
-				if (Preview.currentFrame == 0) {
-					imageBytes = Preview.frames[1];
+				if (MAIN_ACTIVITY.getPreview().getCurrentFrame() == 0) {
+					imageBytes = MAIN_ACTIVITY.getPreview().getFrames()[1];
 				} else {
-					imageBytes = Preview.frames[0];
+					imageBytes = MAIN_ACTIVITY.getPreview().getFrames()[0];
 				}
 
 				if (imageBytes.length > 0) {
@@ -61,7 +61,7 @@ public class SendVideoThread implements Runnable {
 							size = imageBytes.length - i * DATAGRAM_MAX_SIZE;
 
 						// Set additional header
-						byte[] data2 = new byte[HEADER_SIZE + size];
+						byte[] data2 = new byte[HEADER_SIZE + size]; 
 						data2[0] = (byte) frame_nb;
 						data2[1] = (byte) nb_packets;
 						data2[2] = (byte) i;
@@ -76,8 +76,8 @@ public class SendVideoThread implements Runnable {
 
 						int size_p = data2.length;
 						DatagramPacket packet = new DatagramPacket(data2, size_p, clientAddress, VIDEO_PORT);
-						Log.d("Server Packet Assembly", "Sending frame " + frame_nb + " packet " + (i + 1) + "/" + nb_packets);
-						socket.send(packet);
+						//Log.d("Server Packet Assembly", "Sending frame " + frame_nb + " packet " + (i + 1) + "/" + nb_packets);
+						SOCKET.send(packet);
 						data2 = null;
 					}
 				}
