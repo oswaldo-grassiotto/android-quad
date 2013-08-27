@@ -6,6 +6,12 @@ import android.hardware.SensorEventListener;
 
 public class AccelerometerListener implements SensorEventListener {
 	
+	private final QuadController MAIN_ACTIVITY;
+	
+	public AccelerometerListener(QuadController mainActivity){
+		this.MAIN_ACTIVITY = mainActivity;
+	}
+	
 	@Override
 	public void onAccuracyChanged(Sensor sensor, int accuracy) {
 		// TODO Auto-generated method stub
@@ -19,10 +25,6 @@ public class AccelerometerListener implements SensorEventListener {
 		float y = event.values[1];
 		float z = event.values[2];
 		
-		QuadController.accelX = x;
-		QuadController.accelY = y;
-		QuadController.accelZ = z;
-		
-		//QuadController.accelField.setText("Accelerometer x: " + x + " y: " + y + " z: " + z);
+		MAIN_ACTIVITY.setAccelValues(x, y, z);
 	}
 }

@@ -21,28 +21,36 @@ import android.widget.ToggleButton;
 
 public class QuadRemote extends Activity {
 	
-	static SendCommandThread sendCommandThread;
+	private SendCommandThread sendCommandThread;
+	private ReceiveVideoThread receiveVideoThread;
+	
+	public static QuadRemote activity;
+	
+	private CharSequence[] supportedResolutions;
+	private String currentResolution;
 	
 	//User interface variables
-	private static TextView mTextview;
+	private TextView mTextview;
 	private ImageView iv;
-	static Joystick joy1;
-	static Joystick joy2;
-	Button picButton;
-	ToggleButton videoButton;
-	TextView videoTimer;
+	private Joystick joy1;
+	private Joystick joy2;
+	private Button picButton;
+	private ToggleButton videoButton;
+	private TextView videoTimer;
 	
 	//Image variable
-	Bitmap image;
+	private Bitmap image;
 	
 	//Messaging variable
-	private static Handler handler = new Handler();
+	private Handler handler = new Handler();
 
 	/** Called when the activity is first created. */
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.main);
+		
+		activity = this;
 		
 		//Retrieve and store UI elements for later usage
 		mTextview = (TextView) findViewById(R.id.textView1);
@@ -77,14 +85,14 @@ public class QuadRemote extends Activity {
 		
 		try {
 			//Run new thread to receive video frames via UDP socket
-			ReceiveVideoThread receiveVideo = new ReceiveVideoThread(handler, iv);
-			receiveVideo.start();
+			receiveVideoThread = new ReceiveVideoThread(handler, iv);
+			receiveVideoThread.start();
 		} catch (SocketException e1) {
 			e1.printStackTrace();
 		}
 		
 		try {
-			sendCommandThread = new SendCommandThread();
+			sendCommandThread = new SendCommandThread(this);
 			sendCommandThread.start();
 			
 			//Now that we've started the thread we ask the controller 
@@ -96,7 +104,7 @@ public class QuadRemote extends Activity {
 			e.printStackTrace();
 		}
 	}
-
+	
 	/**
 	 * Build a byte array containing to command code and data (when necessary) and
 	 * send it through the socket.
@@ -108,9 +116,9 @@ public class QuadRemote extends Activity {
 	 * 2: begin recording video command
 	 * 3: stop recording video command
 	 */
-	public static synchronized void sendCommand(int command) {
+	public synchronized void sendCommand(int command) {
 		
-		byte[] commandBytes = new byte[5];
+		byte[] commandBytes = new byte[9];
 		
 		switch(command){
 			case 1:
@@ -118,6 +126,11 @@ public class QuadRemote extends Activity {
 			case 3:
 			case 4:
 				commandBytes[0] = (byte) command;
+				break;
+			case 5:
+				commandBytes[0] = (byte) command;
+				byte[] currentResolutionBytes = currentResolution.getBytes();
+				System.arraycopy(currentResolutionBytes, 0, commandBytes, 1, currentResolutionBytes.length);
 				break;
 			default:
 				int x1 = joy1.getxAxis();
@@ -134,7 +147,7 @@ public class QuadRemote extends Activity {
 		sendCommandThread.setCommandBytes(commandBytes);
 	}
 	
-	public static void updateTextView(final String newMessage){
+	public void updateTextView(final String newMessage){
 		handler.post(new Runnable() {
 			@Override
 			public void run() {
@@ -163,8 +176,36 @@ public class QuadRemote extends Activity {
         return true;
     }
     
-    public static void setSupportedResolutions(String resolutionsStr){
+    public void setSupportedResolutions(String resolutionsStr){
     	CharSequence[] resolutions = resolutionsStr.split(",");
-    	SettingsActivity.resolutions = resolutions;
+    	this.supportedResolutions = resolutions;
     }
+
+	/**
+	 * @return the supportedResolutions
+	 */
+	public CharSequence[] getSupportedResolutions() {
+		return supportedResolutions;
+	}
+
+	/**
+	 * @param supportedResolutions the supportedResolutions to set
+	 */
+	public void setSupportedResolutions(CharSequence[] supportedResolutions) {
+		this.supportedResolutions = supportedResolutions;
+	}
+
+	/**
+	 * @return the currentResolution
+	 */
+	public String getCurrentResolution() {
+		return currentResolution;
+	}
+
+	/**
+	 * @param currentResolution the currentResolution to set
+	 */
+	public void setCurrentResolution(String currentResolution) {
+		this.currentResolution = currentResolution;
+	}
 }

@@ -6,15 +6,21 @@ import ioio.lib.util.BaseIOIOLooper;
 import ioio.lib.util.IOIOLooper;
 import ioio.lib.util.android.IOIOActivity;
 
+import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.List;
 
 import android.content.Context;
+import android.graphics.ImageFormat;
+import android.graphics.Rect;
+import android.graphics.YuvImage;
 import android.hardware.Camera;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
+import android.hardware.Camera.Parameters;
+import android.hardware.Camera.PreviewCallback;
 import android.hardware.Camera.Size;
 import android.os.Bundle;
 import android.os.Handler;
@@ -36,8 +42,6 @@ public class QuadController extends IOIOActivity {
 	private final String TAG = "QuadController";
 	
 	// User Interface variables
-	protected SurfaceView mView;
-	protected SurfaceHolder mHolder;
 	private TextView connectionStatus;
 	//public static TextView accelField;
 	//public static TextView gyroField;
@@ -45,26 +49,32 @@ public class QuadController extends IOIOActivity {
 	private Handler handler;
 
 	// Video variables
-	private static Camera mCamera;
-	public static String supportedResolutions;
+	private Camera mCamera;
+	private String supportedResolutions;
+	private Preview preview;
+	private int currentWidth = 320;
+	private int currentHeight = 240;
 	
 	//Joystick variables
-	public static int x1;
-	public static int y1;
-	public static int x2;
-	public static int y2;
+	private int x1;
+	private int y1;
+	private int x2;
+	private int y2;
 	
 	//Sensor variables
-	SensorManager sensorManager;
-	Sensor accelerometer;
-	Sensor gyroscope;
-	public static float accelX;
-	public static float accelY;
-	public static float accelZ;
-	public static float gyroX;
-	public static float gyroY;
-	public static float gyroZ;
+	private SensorManager sensorManager;
+	private Sensor accelerometer;
+	private Sensor gyroscope;
+	private float accelX;
+	private float accelY;
+	private float accelZ;
+	private float gyroX;
+	private float gyroY;
+	private float gyroZ;
 	
+	//Threads
+	private ReceiveCommandThread receiveCommandThread;
+	private SendVideoThread sendVideoThread;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -86,8 +96,8 @@ public class QuadController extends IOIOActivity {
 		//get the gyroscope sensor
 		gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
 
-		sensorManager.registerListener(new AccelerometerListener(), accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
-		sensorManager.registerListener(new GyroscopeListener(), gyroscope, SensorManager.SENSOR_DELAY_NORMAL);
+		sensorManager.registerListener(new AccelerometerListener(this), accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+		sensorManager.registerListener(new GyroscopeListener(this), gyroscope, SensorManager.SENSOR_DELAY_NORMAL);
 		
 		StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
 		StrictMode.setThreadPolicy(policy);
@@ -104,13 +114,13 @@ public class QuadController extends IOIOActivity {
 		
 		supportedResolutions = sizes.substring(0, sizes.length()-1);
 		
-		Preview prev = new Preview(this, mCamera);
-		((LinearLayout) findViewById(R.id.linearLayout1)).addView(prev,	new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		preview = new Preview(this, mCamera);
+		((LinearLayout) findViewById(R.id.linearLayout1)).addView(preview, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 		
 		try {
 			//Run new thread to send video frames via UDP socket
-			Thread sendVideo = new Thread(new SendVideoThread());
-			sendVideo.start();
+			sendVideoThread = new SendVideoThread(this);
+			sendVideoThread.start();
 		} catch (SocketException e1) {
 			Log.e(TAG, "Error in send video thread: " + e1.getMessage());
 		} catch (UnknownHostException e1) {
@@ -119,8 +129,8 @@ public class QuadController extends IOIOActivity {
 
 		try {
 			//Run new thread to receive commands via UDP socket
-			Thread receiveCommand = new Thread(new ReceiveCommandThread());
-			receiveCommand.start();
+			receiveCommandThread = new ReceiveCommandThread(this);
+			receiveCommandThread.start();
 		} catch (SocketException e) {
 			Log.e(TAG, "Error in receive command thread: " + e.getMessage());
 		}
@@ -169,7 +179,7 @@ public class QuadController extends IOIOActivity {
 		}
 	}
 
-	public static void takePicture(){
+	public void takePicture(){
 		mCamera.takePicture(null, null, null, new PhotoHandler());
 	}
 	
@@ -183,17 +193,108 @@ public class QuadController extends IOIOActivity {
 		return new Looper();
 	}
 	
-	public static float round(float unrounded, int precision, int roundingMode)
+	public float round(float unrounded, int precision, int roundingMode)
 	{
 	    BigDecimal bd = new BigDecimal(unrounded);
 	    BigDecimal rounded = bd.setScale(precision, roundingMode);
 	    return rounded.floatValue();
 	}
+	
+	public void changeResolution(int width, int height){
+		this.currentWidth = width;
+		this.currentHeight = height;
+		
+		Log.e(TAG, "Changing resolution to " + width + "x" + height);
+		
+		preview.changeResolution();
+	}
+	
+	public void setJoystickPos(int x1, int y1, int x2, int y2){
+		this.x1 = x1;
+		this.y1 = y1;
+		this.x2 = x2;
+		this.y2 = y2;
+	}
+	
+	public void setGyroValues(float x, float y, float z){
+		this.gyroX = x;
+		this.gyroY = y;
+		this.gyroZ = z;
+	}
+	
+	public void setAccelValues(float x, float y, float z){
+		this.accelX = x;
+		this.accelY = y;
+		this.accelZ = z;
+	}
 
 	/**
 	 * @return the mCamera
 	 */
-	public static Camera getmCamera() {
+	public Camera getmCamera() {
 		return mCamera;
+	}
+
+	/**
+	 * @return the supportedResolutions
+	 */
+	public String getSupportedResolutions() {
+		return supportedResolutions;
+	}
+
+	/**
+	 * @param supportedResolutions the supportedResolutions to set
+	 */
+	public void setSupportedResolutions(String supportedResolutions) {
+		this.supportedResolutions = supportedResolutions;
+	}
+
+	/**
+	 * @return the preview
+	 */
+	public Preview getPreview() {
+		return preview;
+	}
+
+	/**
+	 * @return the receiveCommandThread
+	 */
+	public ReceiveCommandThread getReceiveCommandThread() {
+		return receiveCommandThread;
+	}
+
+	/**
+	 * @return the sendVideoThread
+	 */
+	public SendVideoThread getSendVideoThread() {
+		return sendVideoThread;
+	}
+
+	/**
+	 * @return the currentWidth
+	 */
+	public int getCurrentWidth() {
+		return currentWidth;
+	}
+
+	/**
+	 * @param currentWidth the currentWidth to set
+	 */
+	public void setCurrentWidth(int currentWidth) {
+		this.currentWidth = currentWidth;
+	}
+
+	/**
+	 * @return the currentHeight
+	 */
+	public int getCurrentHeight() {
+		return currentHeight;
+	}
+
+	/**
+	 * @param currentHeight the currentHeight to set
+	 */
+	public void setCurrentHeight(int currentHeight) {
+		this.currentHeight = currentHeight;
 	}
 }

@@ -15,12 +15,16 @@ import android.util.Log;
  * 
  * @author walbao
  */
-class ReceiveCommandThread implements Runnable {
+class ReceiveCommandThread extends Thread {
 
 	private final int SERVER_PORT;
 	private final DatagramSocket socket;
 	
-	public ReceiveCommandThread() throws SocketException {
+	private final QuadController MAIN_ACTIVITY;
+	
+	public ReceiveCommandThread(QuadController mainActivity) throws SocketException {
+		this.MAIN_ACTIVITY = mainActivity;
+		
 		SERVER_PORT = 6774;
 		this.socket = new DatagramSocket(SERVER_PORT);
 	}
@@ -29,41 +33,54 @@ class ReceiveCommandThread implements Runnable {
 	public void run() {
 		while (true) {
 			try {
-				byte[] command = new byte[5];
-				DatagramPacket packet = new DatagramPacket(command,	command.length);
+				byte[] commandBytes = new byte[9];
+				DatagramPacket packet = new DatagramPacket(commandBytes, commandBytes.length);
 				socket.receive(packet);
 
 				byte[] data = packet.getData();
 
-				int commandType = (int) data[0];
+				int command = (int) data[0];
 				
-				Log.d("Command Receiver", "Received command: " + commandType);
+				Log.d("Command Receiver", "Received command: " + command);
 				
-				if (commandType == 0) {
-					//We received a joystick (move) command
-					QuadController.x1 = (int) data[1];
-					QuadController.y1 = (int) data[2];
-					QuadController.x2 = (int) data[3];
-					QuadController.y2 = (int) data[4];
-
-				} else if (commandType == 1) {
-					//We received a take picture command
-					QuadController.takePicture();
-				} else if(commandType == 2){
-					//We received a begin recording video command
-					
-				} else if(commandType == 3){
-					//We received a stop recording video command
-					
-				} else if(commandType == 4){
-					//We received a send available resolutions command
-					byte[] resolutionsData = QuadController.supportedResolutions.getBytes();
-					
-					DatagramPacket resolutionsPacket = new DatagramPacket(resolutionsData, resolutionsData.length, 
-							InetAddress.getByName("192.168.43.1"), 6774);
-					Log.d("Command Receiver", "Sending list: " + new String(resolutionsData, "UTF-8"));
-					socket.send(resolutionsPacket);
+				switch(command){
+					case 0:
+						//We received a joystick (move) command
+						MAIN_ACTIVITY.setJoystickPos((int) data[1], (int) data[2], (int) data[3], (int) data[4]);
+						break;
+					case 1:
+						//We received a take picture command
+						MAIN_ACTIVITY.takePicture();
+						break;
+					case 2:
+						//We received a begin recording video command
+						break;
+					case 3:
+						//We received a stop recording video command
+						break;
+					case 4:
+						//We received a send available resolutions command
+						byte[] resolutionsData = MAIN_ACTIVITY.getSupportedResolutions().getBytes();
+						
+						DatagramPacket resolutionsPacket = new DatagramPacket(resolutionsData, resolutionsData.length, 
+								InetAddress.getByName("192.168.43.1"), 6774);
+						Log.d("Command Receiver", "Sending list: " + new String(resolutionsData, "UTF-8"));
+						socket.send(resolutionsPacket);
+						break;
+					case 5:
+						//we received a change resolution command
+						byte stringBytes[] = new byte[8];
+						System.arraycopy(data, 1, stringBytes, 0, data.length-1);
+						String resolution = new String (stringBytes, "UTF-8").trim();
+						String[] resolutionArray = resolution.split("x");
+						int width = Integer.parseInt(resolutionArray[0]);
+						int height = Integer.parseInt(resolutionArray[1]);
+						
+						MAIN_ACTIVITY.changeResolution(width, height);
+						break;
 				}
+				
+				
 			} catch (Exception e) {
 				Log.e("Command Receiver Body", e.getMessage());
 			}
