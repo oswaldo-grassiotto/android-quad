@@ -53,16 +53,25 @@ public class QuadController extends IOIOActivity {
 	private int x2;
 	private int y2;
 	
+	//Directions:
+	//0 - stop
+	//1 - hover
+	//2 - up
+	//3 - down
+	//4 - left
+	//5 - right
+	private int direction = 0;
+	
 	//Sensor variables
 	private SensorManager sensorManager;
 	private Sensor accelerometer;
-	private Sensor gyroscope;
+	private Sensor orientation;
 	private float accelX;
 	private float accelY;
 	private float accelZ;
-	private float gyroX;
-	private float gyroY;
-	private float gyroZ;
+	private float orientationX;
+	private float orientationY;
+	private float orientationZ;
 	
 	//Threads
 	private ReceiveCommandThread receiveCommandThread;
@@ -86,10 +95,10 @@ public class QuadController extends IOIOActivity {
 		//get the accelerometer sensor
 		accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
 		//get the gyroscope sensor
-		gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+		orientation = sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION);
 
 		sensorManager.registerListener(new AccelerometerListener(this), accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
-		sensorManager.registerListener(new GyroscopeListener(this), gyroscope, SensorManager.SENSOR_DELAY_NORMAL);
+		sensorManager.registerListener(new OrientationListener(this), orientation, SensorManager.SENSOR_DELAY_NORMAL);
 		
 		StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
 		StrictMode.setThreadPolicy(policy);
@@ -129,8 +138,7 @@ public class QuadController extends IOIOActivity {
 		
 	}
 	
-	// This is the thread which sends commands to the IOIO (controls the motors)
-	@SuppressWarnings("unused")
+	// This is the thread which has access to the IOIO's I/O pins (controls the motors)
 	class Looper extends BaseIOIOLooper {
 
 		// The on-board LED
@@ -142,26 +150,81 @@ public class QuadController extends IOIOActivity {
 		private PwmOutput backLeftMotor;
 		private PwmOutput backRightMotor;
 		
+		private float frontLeftMult = 0; 
+		private float frontRightMult = 0;
+		private float backLeftMult = 0;
+		private float backRightMult = 0;
+		
+		private int currentDirection = 0;
+		
 		@Override
 		protected void setup() throws ConnectionLostException {
 			_led = ioio_.openPwmOutput(0, 300);
 			
-			//frontLeftMotor = ioio_.openPwmOutput(1, 50); // 20ms periods
-			//frontRightMotor = ioio_.openPwmOutput(3, 50); // 20ms periods
+			frontLeftMotor = ioio_.openPwmOutput(1, 50); // 20ms periods
+			frontRightMotor = ioio_.openPwmOutput(3, 50); // 20ms periods
 			backLeftMotor = ioio_.openPwmOutput(5, 50); // 20ms periods
-			//backRightMotor = ioio_.openPwmOutput(7, 50); // 20ms periods
+			backRightMotor = ioio_.openPwmOutput(7, 50); // 20ms periods
+			
+			frontLeftMult = round((-y1 + 120f) / 240f, 2, BigDecimal.ROUND_HALF_UP);
+			frontRightMult = round((-y1 + 120f) / 240f, 2, BigDecimal.ROUND_HALF_UP);
+			backLeftMult = round((-y1 + 120f) / 240f, 2, BigDecimal.ROUND_HALF_UP);
+			backRightMult = round((-y1 + 120f) / 240f, 2, BigDecimal.ROUND_HALF_UP);
 		}
 		
 		@Override
 		public void loop() throws ConnectionLostException {
-			final float m1 = round((-y1 + 120f) / 240f, 2, BigDecimal.ROUND_HALF_UP);
 			
-			//frontLeftMotor.setDutyCycle(0.05f + _varValue * 0.05f);
-			//frontRightMotor.setDutyCycle(0.05f + _varValue * 0.05f);
-			backLeftMotor.setDutyCycle(0.05f + m1 * 0.05f);
-			//backRightMotor.setDutyCycle(0.05f + _varValue * 0.05f);
+			if(currentDirection != direction){
+				int add = -52;
+				if(direction == 2)
+					add = -59;
+				else if(direction == 3)
+					add = -45;
+				
+				frontLeftMult = round((add + 120f) / 240f, 2, BigDecimal.ROUND_HALF_UP);
+				frontRightMult = round((add + 120f) / 240f, 2, BigDecimal.ROUND_HALF_UP);
+				backLeftMult = round((add + 120f) / 240f, 2, BigDecimal.ROUND_HALF_UP);
+				backRightMult = round((add + 120f) / 240f, 2, BigDecimal.ROUND_HALF_UP);
+			}
 			
-			_led.setDutyCycle(1 - m1);
+			if(accelX < -10.6 || accelX > -10.4){
+				if(accelY > 0.5){
+					frontRightMult++;
+					backRightMult++;
+					
+					frontLeftMult--;
+					backLeftMult--;
+				} else if(accelY < -1.5){
+					frontLeftMult++;
+					backLeftMult++;
+					
+					frontRightMult--;
+					backRightMult--;
+				}
+				
+				if(accelZ > 1.5){
+					frontRightMult++;
+					frontLeftMult++;
+					
+					backRightMult--;
+					backLeftMult--;
+				} else if(accelZ < -0.5){
+					backRightMult++;
+					backLeftMult++;
+					
+					frontRightMult--;
+					frontLeftMult--;
+				}
+			}
+			
+			
+			frontLeftMotor.setDutyCycle(0.05f + frontLeftMult * 0.05f);
+			frontRightMotor.setDutyCycle(0.05f + frontRightMult * 0.05f);
+			backLeftMotor.setDutyCycle(0.05f + backLeftMult * 0.05f);
+			backRightMotor.setDutyCycle(0.05f + backRightMult * 0.05f);
+			
+			_led.setDutyCycle(1 - frontLeftMult);
 			
 			handler.post(new Runnable() {
 				@Override
@@ -207,12 +270,22 @@ public class QuadController extends IOIOActivity {
 		this.y1 = y1;
 		this.x2 = x2;
 		this.y2 = y2;
+		
+		if(y1 <= -53)
+			//go up
+			direction = 2;
+		else if(y1 >= 51)
+			//go down
+			direction = 3;
+		else
+			//hover
+			direction = 1;
 	}
 	
-	public void setGyroValues(float x, float y, float z){
-		this.gyroX = x;
-		this.gyroY = y;
-		this.gyroZ = z;
+	public void setOriValues(float x, float y, float z){
+		this.orientationX = x;
+		this.orientationY = y;
+		this.orientationZ = z;
 	}
 	
 	public void setAccelValues(float x, float y, float z){
