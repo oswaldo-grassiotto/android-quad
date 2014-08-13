@@ -56,8 +56,19 @@ public class Joystick extends View {
             public boolean onTouch(View v, MotionEvent event) {  
                 if(event.getAction() == MotionEvent.ACTION_DOWN){
                 	
-                } else if(event.getAction() == MotionEvent.ACTION_MOVE){  
-                    pontoFinal.set((int) event.getX(), (int) event.getY());  
+                } else if(event.getAction() == MotionEvent.ACTION_MOVE){
+                	float eventX = event.getX();
+                	float eventY = event.getY();
+                	
+                	if( eventX >= 0 && eventX <= larg)
+                		pontoFinal.x = (int)eventX;
+                    
+                	if( eventY >= 0 && eventY <= alt){
+                		pontoFinal.y = (int)eventY;
+                		MAIN_ACTIVITY.mTextview2.setText("y:" + event.getY());
+                	}
+                	
+                    
                     invalidate();
                     
 					MAIN_ACTIVITY.sendCommand(0);

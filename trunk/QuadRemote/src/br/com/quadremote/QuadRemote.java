@@ -31,6 +31,7 @@ public class QuadRemote extends Activity {
 	
 	//User interface variables
 	private TextView mTextview;
+	public static TextView mTextview2;
 	private ImageView iv;
 	private Joystick joy1;
 	private Joystick joy2;
@@ -54,6 +55,7 @@ public class QuadRemote extends Activity {
 		
 		//Retrieve and store UI elements for later usage
 		mTextview = (TextView) findViewById(R.id.textView1);
+		mTextview2 = (TextView) findViewById(R.id.textView2);
 		iv = (ImageView) findViewById(R.id.imageView1);
 		joy1 = (Joystick) findViewById(R.id.joystick1);
 		joy2 = (Joystick) findViewById(R.id.joystick2);
