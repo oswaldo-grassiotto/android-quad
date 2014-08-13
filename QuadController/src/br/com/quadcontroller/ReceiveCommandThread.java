@@ -47,6 +47,7 @@ class ReceiveCommandThread extends Thread {
 					case 0:
 						//We received a joystick (move) command
 						MAIN_ACTIVITY.setJoystickPos((int) data[1], (int) data[2], (int) data[3], (int) data[4]);
+						Log.d("Command Receiver", "Joystick command received: " + "x1:" + ((int) data[1]) + " y1:" + ((int) data[2]) + " x2:" + ((int) data[3]) + "y2:" + ((int) data[4]));
 						break;
 					case 1:
 						//We received a take picture command

@@ -6,28 +6,20 @@ import ioio.lib.util.BaseIOIOLooper;
 import ioio.lib.util.IOIOLooper;
 import ioio.lib.util.android.IOIOActivity;
 
-import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.List;
 
 import android.content.Context;
-import android.graphics.ImageFormat;
-import android.graphics.Rect;
-import android.graphics.YuvImage;
 import android.hardware.Camera;
+import android.hardware.Camera.Size;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
-import android.hardware.Camera.Parameters;
-import android.hardware.Camera.PreviewCallback;
-import android.hardware.Camera.Size;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.StrictMode;
 import android.util.Log;
-import android.view.SurfaceHolder;
-import android.view.SurfaceView;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -134,6 +126,7 @@ public class QuadController extends IOIOActivity {
 		} catch (SocketException e) {
 			Log.e(TAG, "Error in receive command thread: " + e.getMessage());
 		}
+		
 	}
 	
 	// This is the thread which sends commands to the IOIO (controls the motors)
