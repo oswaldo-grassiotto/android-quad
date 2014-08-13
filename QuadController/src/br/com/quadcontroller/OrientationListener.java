@@ -4,11 +4,11 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 
-public class GyroscopeListener implements SensorEventListener {
+public class OrientationListener implements SensorEventListener {
 	
 	private final QuadController MAIN_ACTIVITY;
 	
-	public GyroscopeListener(QuadController mainActivity){
+	public OrientationListener(QuadController mainActivity){
 		this.MAIN_ACTIVITY = mainActivity;
 	}
 	
@@ -20,11 +20,10 @@ public class GyroscopeListener implements SensorEventListener {
 	
 	@Override
 	public void onSensorChanged(SensorEvent event) {
-		// Many sensors return 3 values, one for each axis.
 		float x = event.values[0];
 		float y = event.values[1];
 		float z = event.values[2];
 		
-		MAIN_ACTIVITY.setGyroValues(x, y, z);
+		MAIN_ACTIVITY.setOriValues(x, y, z);
 	}
 }
