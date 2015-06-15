@@ -43,8 +43,7 @@ public class Joystick extends View {
             larg = getWidth();  
             alt = getHeight();  
           
-            //pontoMeio = new Point(larg/2, alt/2);
-        	pontoMeio = new Point(-52, -52);
+            pontoMeio = new Point(larg/2, alt/2);  
         }  
         
         super.onDraw(canvas);  
@@ -65,8 +64,8 @@ public class Joystick extends View {
                 		pontoFinal.x = (int)eventX;
                     
                 	if( eventY >= 0 && eventY <= alt){
-                		pontoFinal.y = ((int)(eventY/5.5)) - 85;
-                		MAIN_ACTIVITY.mTextview2.setText("y:" + pontoFinal.y);
+                		pontoFinal.y = (int)eventY;
+                		MAIN_ACTIVITY.mTextview2.setText("y:" + event.getY());
                 	}
                 	
                     
@@ -75,8 +74,7 @@ public class Joystick extends View {
 					MAIN_ACTIVITY.sendCommand(0);
                     
                 } else if(event.getAction() == MotionEvent.ACTION_UP){  
-                    pontoFinal.set(pontoMeio.x, pontoMeio.y);
-                    MAIN_ACTIVITY.mTextview2.setText("y:" + pontoMeio.y);
+                    pontoFinal.set(pontoMeio.x, pontoMeio.y);  
                     invalidate();
                     
                     MAIN_ACTIVITY.sendCommand(0);
@@ -123,7 +121,7 @@ public class Joystick extends View {
     public int getyAxis(){  
         int ret = 0;  
           
-       /* if(pontoFinal.y > 0 && pontoFinal.y < alt){  
+        if(pontoFinal.y > 0 && pontoFinal.y < alt){  
             ret = pontoFinal.y - pontoMeio.y;  
         }  
           
@@ -133,8 +131,8 @@ public class Joystick extends View {
           
         if(pontoFinal.y < 0){  
             ret = 0-(alt/2);  
-        }*/  
+        }  
           
-        return pontoFinal.y;  
+        return ret;  
     }  
 } 
