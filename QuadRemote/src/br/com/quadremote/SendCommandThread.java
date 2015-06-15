@@ -28,7 +28,7 @@ public class SendCommandThread extends Thread {
 		this.MAIN_ACTIVITY = mainActivity;
 		
 		//this.SERVER_ADDRESS = InetAddress.getByName("192.168.43.201");
-		this.SERVER_ADDRESS = InetAddress.getByName("192.168.1.106");
+		this.SERVER_ADDRESS = InetAddress.getByName("192.168.3.159");
 		this.SOCKET = new DatagramSocket(SERVER_PORT);
 		SOCKET.setSoTimeout(4000);
 	}

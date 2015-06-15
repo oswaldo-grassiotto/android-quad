@@ -1,8 +1,5 @@
 package br.com.quadcontroller;
 
-import ioio.lib.api.DigitalOutput;
-import ioio.lib.api.DigitalOutput.Spec.Mode;
-import ioio.lib.api.IOIO;
 import ioio.lib.api.PwmOutput;
 import ioio.lib.api.exception.ConnectionLostException;
 import ioio.lib.util.BaseIOIOLooper;
@@ -20,13 +17,9 @@ import android.hardware.Camera.Size;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.StrictMode;
 import android.util.Log;
-import android.view.ViewGroup;
-import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
 /**
  * Main activity
@@ -39,10 +32,8 @@ public class QuadController extends IOIOActivity {
 	
 	// User Interface variables
 	public static TextView connectionStatus;
-	//public static TextView accelField;
-	//public static TextView gyroField;
 	public static TextView _varField;
-	private Handler handler;
+	//private Handler handler;
 
 	// Video variables
 	private Camera mCamera;
@@ -52,19 +43,10 @@ public class QuadController extends IOIOActivity {
 	private int currentHeight = 240;
 	
 	//Joystick variables
-	public static int x1;
-	public static int y1;
-	public static int x2;
-	public static int y2;
-	
-	//Directions:
-	//0 - stop
-	//1 - hover
-	//2 - up
-	//3 - down
-	//4 - left
-	//5 - right
-	private int direction = 0;
+	public static int x1 = 50;
+	public static int y1 = 50;
+	public static int x2 = 50;
+	public static int y2 = 50;
 	
 	//Sensor variables
 	private SensorManager sensorManager;
@@ -84,14 +66,12 @@ public class QuadController extends IOIOActivity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.main);
 
-		handler = new Handler();
+		//handler = new Handler();
 		
 		// Retrieve and store UI elements for later usage
 		connectionStatus = (TextView) findViewById(R.id.connection_status_textview);
 		_varField = (TextView) findViewById(R.id.textView1);
-		//accelField = (TextView) findViewById(R.id.textView2);
-		//gyroField = (TextView) findViewById(R.id.textView3);
-		_varField.setText("aa");
+		
 		//get the sensor service
 		sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
 		
@@ -167,12 +147,6 @@ public class QuadController extends IOIOActivity {
 			frontRightMotor = ioio_.openPwmOutput(3, 50); // 20ms periods
 			rearLeftMotor = ioio_.openPwmOutput(5, 50); // 20ms periods
 			rearRightMotor = ioio_.openPwmOutput(7, 50); // 20ms periods
-			
-			int joystickCenter = 50;
-			int joystickDeadZone = 3;
-			
-			deadZoneHigh = joystickCenter + joystickDeadZone;
-			deadZoneLow = joystickCenter - joystickDeadZone;
 		}
 		
 		@Override
@@ -183,41 +157,43 @@ public class QuadController extends IOIOActivity {
 			rearLeftMult = 0;
 			rearRightMult = 0;
 			
-			//Values assume the phone is sideways
-			float yaw = quadRotation[0];
+											 //Centered values below assume the phone is sideways with the back camera facing forward
 			float roll = quadRotation[1];    //Centered at 0, roll to the left/counterclockwise to get positive values
 			float pitch = quadRotation[2];   //Centered at 90, pitch down to increase values
 			
-			//Joystick inside roll deadzone, we should keep the quad centered roll wise 
-			if(x1 < deadZoneHigh && x1 > deadZoneLow){
-				
-				float rollMod = roll/100f;
-				
-				frontLeftMult += rollMod;
-				rearLeftMult += rollMod;
-				
-				frontRightMult += -rollMod;
-				rearRightMult += -rollMod;
-			} else {
-				
+			float rollMod = 0;
+			
+			//Joystick outside roll deadzone, read the joystick's x value and apply it
+			if(x1 > deadZoneHigh || x1 < deadZoneLow){
+				rollMod = (x1 - 50)/10;
 			}
 			
-			//Joystick inside pitch deadzone, we should keep the quad centered pitch wise
-			if(y1 < deadZoneHigh && y1 > deadZoneLow){
-				
-				float pitchMod = pitch/100f;
-				
-				frontLeftMult += pitchMod;
-				frontRightMult += pitchMod;
-				
-				rearLeftMult += -pitchMod;
-				rearRightMult += -pitchMod;
-			} else {
-				
+			rollMod += roll/100f;
+			
+			frontLeftMult += rollMod;
+			rearLeftMult += rollMod;
+			
+			frontRightMult += -rollMod;
+			rearRightMult += -rollMod;
+						
+			
+			float pitchMod = 0; 
+			
+			//Joystick outside pitch deadzone, read the joystick's y value and apply it
+			if(y1 > deadZoneHigh || y1 < deadZoneLow){
+				pitchMod = (y1 - 50)/10;
 			}
+			
+			pitchMod += (pitch-90)/100f;
+			
+			frontLeftMult += pitchMod;
+			frontRightMult += pitchMod;
+			
+			rearLeftMult += -pitchMod;
+			rearRightMult += -pitchMod;
 			
 			//We don't compensate for yaw so just move when we have to
-			float yawMod = yaw/100f;
+			float yawMod = (x2-50)/100f;
 			
 			frontLeftMult += yawMod;
 			rearRightMult += yawMod;
@@ -233,12 +209,134 @@ public class QuadController extends IOIOActivity {
 			rearLeftMult += hoverMod;
 			rearRightMult += hoverMod;
 			
-			frontLeftMotor.setDutyCycle((0.05f + frontLeftMult * 0.05f) * frontLeftMult);
-			frontRightMotor.setDutyCycle((0.05f + frontRightMult * 0.05f) * frontRightMult);
-			rearLeftMotor.setDutyCycle((0.05f + rearLeftMult * 0.05f) * rearLeftMult);
-			rearRightMotor.setDutyCycle((0.05f + rearRightMult * 0.05f) * rearRightMult);
+			//The maths are very much experimental at this point, clamping guarantees the duty cycle remains within the expected range
+			frontLeftMult = clamp(frontLeftMult);
+			frontRightMult = clamp(frontRightMult);
+			rearLeftMult = clamp(rearLeftMult);
+			rearRightMult = clamp(rearRightMult);
+			
+			frontLeftMotor.setDutyCycle(0.05f + frontLeftMult * 0.05f);
+			frontRightMotor.setDutyCycle(0.05f + frontRightMult * 0.05f);
+			rearLeftMotor.setDutyCycle(0.05f + rearLeftMult * 0.05f);
+			rearRightMotor.setDutyCycle(0.05f + rearRightMult * 0.05f);
 
 		}
+		
+		/**
+		 * Clamps any value outside the 0.1 - 1 range
+		 * 
+		 * @param value the value to be checked
+		 * @return the value itself if it's within the accepted range or whichever extreme the value exceeded
+		 */
+		private float clamp(float value){
+			if(value > 1)
+				return 1;
+			else if(value < 0.1f)
+				return 0.1f;
+			else
+				return value;
+		}
+	}
+	
+	/**
+	 * Debug method used to display the phones orientation and duty cycle used for each motor
+	 */
+	public void printStabilizationData(){
+		float frontLeftMult = 0;
+		float frontRightMult = 0;
+		float rearLeftMult = 0;
+		float rearRightMult = 0;
+		
+		//Values assume the phone is sideways
+		float roll = quadRotation[1];    //Centered at 0, roll to the left/counterclockwise to get positive values
+		float pitch = quadRotation[2];   //Centered at 90, pitch down to increase values
+		
+		float rollMod = 0;
+		
+		//Joystick outside roll deadzone, read the joystick's x value and apply it
+		if(x1 > 53 || x1 < 47){
+			rollMod = (x1 - 50)/10;
+		}
+		
+		rollMod += roll/100f;
+		
+		frontLeftMult += rollMod;
+		rearLeftMult += rollMod;
+		
+		frontRightMult += -rollMod;
+		rearRightMult += -rollMod;
+					
+		
+		float pitchMod = 0; 
+		
+		//Joystick outside pitch deadzone, read the joystick's y value and apply it
+		if(y1 > 53 || y1 < 47){
+			pitchMod = (y1 - 50)/10;
+		}
+		
+		pitchMod += (pitch-90)/100f;
+		
+		frontLeftMult += pitchMod;
+		frontRightMult += pitchMod;
+		
+		rearLeftMult += -pitchMod;
+		rearRightMult += -pitchMod;
+		
+		//We don't compensate for yaw so just move when we have to
+		float yawMod = (x2-50)/100f;
+		
+		frontLeftMult += yawMod;
+		rearRightMult += yawMod;
+		
+		rearLeftMult += -yawMod;
+		frontRightMult += -yawMod;
+		
+		//We're using manual hover controls for now 
+		float hoverMod = y2/100f;
+		
+		frontLeftMult += hoverMod;
+		frontRightMult += hoverMod;
+		rearLeftMult += hoverMod;
+		rearRightMult += hoverMod;
+		
+		//The maths are very much experimental at this point, clamping guarantees the duty cycle remains within the expected range
+		frontLeftMult = clamp(frontLeftMult);
+		frontRightMult = clamp(frontRightMult);
+		rearLeftMult = clamp(rearLeftMult);
+		rearRightMult = clamp(rearRightMult);
+		
+		final float flm = frontLeftMult;
+		final float frm = frontRightMult;
+		final float rlm = rearLeftMult;
+		final float rrm = rearRightMult;
+		
+		QuadController._varField.post(new Runnable() {
+            public void run() {
+            	
+            	float fl = (0.05f + flm * 0.05f);
+        		float fr = (0.05f + frm * 0.05f);
+        		float rl = (0.05f + rlm * 0.05f);
+        		float rr = (0.05f + rrm * 0.05f);
+        		
+        		_varField.setText("fl: " + fl + " | rl: " + rl + " | fr: " + fr + " | rr: " + rr);
+            }
+        });
+		
+		final float[] rot = quadRotation;
+		QuadController.connectionStatus.post(new Runnable() {
+            public void run() {
+        		connectionStatus.setText("yaw: " + rot[0] + " | roll: " + rot[1] + " | pitch: " + rot[2]);
+            }
+        });
+	}
+	
+	private float clamp(float value){
+		if(value > 1)
+			return 1;
+		else if(value < 0.1f)
+			return 0.1f;
+		else
+			return value;
 	}
 
 	public void takePicture(){
@@ -266,33 +364,16 @@ public class QuadController extends IOIOActivity {
 		preview.changeResolution();
 	}
 	
-	public void setJoystickPos(int x1, final int y1, int x2, int y2){
-		this.x1 = x1;
-		this.y1 = y1;
-		this.x2 = x2;
-		this.y2 = y2;
-		
-		if(y1 <= -53)
-			//go up
-			direction = 2;
-		else if(y1 >= 51)
-			//go down
-			direction = 3;
-		else
-			//hover
-			direction = 1;
-		
-		//
-		Log.d("Command Receiver", "Joystick command received: " + "x1:" + (this.x1) + " y1:" + ((this.y1) + " x2:" + (this.x2) + " y2:" + (this.y2)));
-		QuadController._varField.post(new Runnable() {
-            public void run() {
-            	_varField.setText((0.05f + (y1/100f) * 0.05f)+"");
-            }
-        });
+	public void setJoystickPos(int x1, int y1, int x2, int y2){
+		QuadController.x1 = x1;
+		QuadController.y1 = y1;
+		QuadController.x2 = x2;
+		QuadController.y2 = y2;
 	}
 	
 	public void setRotation(float[] rotationVector){
 		calculateAngles(quadRotation, rotationVector);
+		printStabilizationData();
 	}
 	
 	/**
