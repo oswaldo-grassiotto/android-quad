@@ -10,6 +10,7 @@ import android.graphics.YuvImage;
 import android.hardware.Camera;
 import android.hardware.Camera.Parameters;
 import android.hardware.Camera.PreviewCallback;
+import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
@@ -50,9 +51,8 @@ class Preview extends SurfaceView implements SurfaceHolder.Callback {
 
 		try {
 			MAIN_ACTIVITY.getmCamera().setPreviewDisplay(holder);
-
 		} catch (IOException e) {
-			e.printStackTrace();
+			Log.e("Preview", "Error setting preview display", e);
 		}
 
 		// Create callback that is executed at every new preview frame
@@ -65,7 +65,7 @@ class Preview extends SurfaceView implements SurfaceHolder.Callback {
 						MAIN_ACTIVITY.getCurrentHeight(), null);
 				yuvImage.compressToJpeg(new Rect(0, 0, MAIN_ACTIVITY.getCurrentWidth(), 
 						MAIN_ACTIVITY.getCurrentHeight()), jpegQuality, out);
-
+				
 				if (currentFrame == 0) {
 					frames[0] = out.toByteArray();
 					currentFrame = 1;

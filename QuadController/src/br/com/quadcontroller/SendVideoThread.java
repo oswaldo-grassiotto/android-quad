@@ -25,10 +25,13 @@ public class SendVideoThread extends Thread {
 	
 	private final int DATAGRAM_MAX_SIZE = 491;
 	private final int HEADER_SIZE = 5;
-	private final String CLIENT_IP = "192.168.43.1";
+	//private final String CLIENT_IP = "192.168.43.1";
+	private final String CLIENT_IP = "192.168.1.107";
 	private final int VIDEO_PORT = 6775;
 	private final DatagramSocket SOCKET;
 	private final QuadController MAIN_ACTIVITY;
+	
+	private boolean run = true;
 	
 
 	public SendVideoThread(QuadController mainActivity) throws SocketException, UnknownHostException {
@@ -39,7 +42,8 @@ public class SendVideoThread extends Thread {
 	}
 	
 	public void run() {
-		while (true) {
+		run = true;
+		while (run) {
 			try {
 				byte[] imageBytes;
 				if (MAIN_ACTIVITY.getPreview().getCurrentFrame() == 0) {
@@ -47,6 +51,8 @@ public class SendVideoThread extends Thread {
 				} else {
 					imageBytes = MAIN_ACTIVITY.getPreview().getFrames()[0];
 				}
+				
+				//Log.d("SendVideo", "sending " + MAIN_ACTIVITY.getPreview().getCurrentFrame() + " - " + imageBytes.length);
 
 				if (imageBytes.length > 0) {
 					frame_nb++;
@@ -81,11 +87,22 @@ public class SendVideoThread extends Thread {
 						data2 = null;
 					}
 				}
+				
 				imageBytes = null;
+				Thread.sleep(500);
 			} catch (Exception e) {
 				Log.e(TAG, e.getMessage());
 				e.printStackTrace();
 			}
 		}
+	}
+	
+	public void stopThread(){
+		run = false;
+		this.SOCKET.close();
+	}
+
+	public boolean getRun() {
+		return run;
 	}
 }

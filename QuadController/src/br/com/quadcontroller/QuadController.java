@@ -1,5 +1,8 @@
 package br.com.quadcontroller;
 
+import ioio.lib.api.DigitalOutput;
+import ioio.lib.api.DigitalOutput.Spec.Mode;
+import ioio.lib.api.IOIO;
 import ioio.lib.api.PwmOutput;
 import ioio.lib.api.exception.ConnectionLostException;
 import ioio.lib.util.BaseIOIOLooper;
@@ -23,6 +26,7 @@ import android.util.Log;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 /**
  * Main activity
@@ -34,7 +38,7 @@ public class QuadController extends IOIOActivity {
 	private final String TAG = "QuadController";
 	
 	// User Interface variables
-	private TextView connectionStatus;
+	public static TextView connectionStatus;
 	//public static TextView accelField;
 	//public static TextView gyroField;
 	public static TextView _varField;
@@ -48,21 +52,28 @@ public class QuadController extends IOIOActivity {
 	private int currentHeight = 240;
 	
 	//Joystick variables
-	private int x1;
-	private int y1;
-	private int x2;
-	private int y2;
+	public static int x1;
+	public static int y1;
+	public static int x2;
+	public static int y2;
+	
+	//Directions:
+	//0 - stop
+	//1 - hover
+	//2 - up
+	//3 - down
+	//4 - left
+	//5 - right
+	private int direction = 0;
 	
 	//Sensor variables
 	private SensorManager sensorManager;
-	private Sensor accelerometer;
-	private Sensor gyroscope;
-	private float accelX;
-	private float accelY;
-	private float accelZ;
-	private float gyroX;
-	private float gyroY;
-	private float gyroZ;
+	private Sensor rotationSensor;
+	
+	//Position variables
+	private float[] rMatrix = new float[9];
+	private float[] tempRMatrix = new float[9];
+	private float[] quadRotation = new float[3];
 	
 	//Threads
 	private ReceiveCommandThread receiveCommandThread;
@@ -80,21 +91,20 @@ public class QuadController extends IOIOActivity {
 		_varField = (TextView) findViewById(R.id.textView1);
 		//accelField = (TextView) findViewById(R.id.textView2);
 		//gyroField = (TextView) findViewById(R.id.textView3);
-		
+		_varField.setText("aa");
 		//get the sensor service
 		sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-		//get the accelerometer sensor
-		accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-		//get the gyroscope sensor
-		gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+		
+		//get the rotation vector sensor
+		rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
 
-		sensorManager.registerListener(new AccelerometerListener(this), accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
-		sensorManager.registerListener(new GyroscopeListener(this), gyroscope, SensorManager.SENSOR_DELAY_NORMAL);
+		sensorManager.registerListener(new RotationListener(this), rotationSensor, SensorManager.SENSOR_DELAY_NORMAL);
 		
 		StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
 		StrictMode.setThreadPolicy(policy);
 
 		// Initialize the camera, create and add its preview surface to our layout
+		Log.d("keke", "keke");
 		mCamera = Camera.open();
 		
 		//Set a list of supported resolutions so the remote can request it when needed
@@ -129,58 +139,110 @@ public class QuadController extends IOIOActivity {
 		
 	}
 	
-	// This is the thread which sends commands to the IOIO (controls the motors)
-	@SuppressWarnings("unused")
+	// This is the thread which has access to the IOIO's I/O pins (controls the motors)
 	class Looper extends BaseIOIOLooper {
 
 		// The on-board LED
-		private PwmOutput _led;
+		//private DigitalOutput _led;
+		//private PwmOutput _pin1;
+		//private PwmOutput _pin3;
 		
 		// The four motors :)
 		private PwmOutput frontLeftMotor;
 		private PwmOutput frontRightMotor;
-		private PwmOutput backLeftMotor;
-		private PwmOutput backRightMotor;
+		private PwmOutput rearLeftMotor;
+		private PwmOutput rearRightMotor;
+		
+		private float frontLeftMult = 1; 
+		private float frontRightMult = 1;
+		private float rearLeftMult = 1;
+		private float rearRightMult = 1;
+		
+		private int deadZoneHigh = 53;
+		private int deadZoneLow = 47;
 		
 		@Override
 		protected void setup() throws ConnectionLostException {
-			_led = ioio_.openPwmOutput(0, 300);
-			
 			frontLeftMotor = ioio_.openPwmOutput(1, 50); // 20ms periods
 			frontRightMotor = ioio_.openPwmOutput(3, 50); // 20ms periods
-			backLeftMotor = ioio_.openPwmOutput(5, 50); // 20ms periods
-			backRightMotor = ioio_.openPwmOutput(7, 50); // 20ms periods
+			rearLeftMotor = ioio_.openPwmOutput(5, 50); // 20ms periods
+			rearRightMotor = ioio_.openPwmOutput(7, 50); // 20ms periods
+			
+			int joystickCenter = 50;
+			int joystickDeadZone = 3;
+			
+			deadZoneHigh = joystickCenter + joystickDeadZone;
+			deadZoneLow = joystickCenter - joystickDeadZone;
 		}
 		
 		@Override
 		public void loop() throws ConnectionLostException {
-			final float m1 = round((-y1 + 120f) / 240f, 2, BigDecimal.ROUND_HALF_UP);
 			
-			//frontLeftMotor.setDutyCycle(0.05f + m1 * 0.05f);
-			//frontRightMotor.setDutyCycle(0.05f + m1 * 0.05f);
-			//backLeftMotor.setDutyCycle(0.05f + m1 * 0.05f);
-			//backRightMotor.setDutyCycle(0.05f + m1 * 0.05f);
+			frontLeftMult = 0;
+			frontRightMult = 0;
+			rearLeftMult = 0;
+			rearRightMult = 0;
 			
-			_led.setDutyCycle(1 - m1);
+			//Values assume the phone is sideways
+			float yaw = quadRotation[0];
+			float roll = quadRotation[1];    //Centered at 0, roll to the left/counterclockwise to get positive values
+			float pitch = quadRotation[2];   //Centered at 90, pitch down to increase values
 			
-			_varField.setText("y: " + y1 + " - m1: " + m1);
-//			
-//			handler.post(new Runnable() {
-//				@Override
-//				public void run() {
-//					_varField.setText("y: " + y1);
-//				}
-//			});
+			//Joystick inside roll deadzone, we should keep the quad centered roll wise 
+			if(x1 < deadZoneHigh && x1 > deadZoneLow){
+				
+				float rollMod = roll/100f;
+				
+				frontLeftMult += rollMod;
+				rearLeftMult += rollMod;
+				
+				frontRightMult += -rollMod;
+				rearRightMult += -rollMod;
+			} else {
+				
+			}
+			
+			//Joystick inside pitch deadzone, we should keep the quad centered pitch wise
+			if(y1 < deadZoneHigh && y1 > deadZoneLow){
+				
+				float pitchMod = pitch/100f;
+				
+				frontLeftMult += pitchMod;
+				frontRightMult += pitchMod;
+				
+				rearLeftMult += -pitchMod;
+				rearRightMult += -pitchMod;
+			} else {
+				
+			}
+			
+			//We don't compensate for yaw so just move when we have to
+			float yawMod = yaw/100f;
+			
+			frontLeftMult += yawMod;
+			rearRightMult += yawMod;
+			
+			rearLeftMult += -yawMod;
+			frontRightMult += -yawMod;
+			
+			//We're using manual hover controls for now 
+			float hoverMod = y2/100f;
+			
+			frontLeftMult += hoverMod;
+			frontRightMult += hoverMod;
+			rearLeftMult += hoverMod;
+			rearRightMult += hoverMod;
+			
+			frontLeftMotor.setDutyCycle((0.05f + frontLeftMult * 0.05f) * frontLeftMult);
+			frontRightMotor.setDutyCycle((0.05f + frontRightMult * 0.05f) * frontRightMult);
+			rearLeftMotor.setDutyCycle((0.05f + rearLeftMult * 0.05f) * rearLeftMult);
+			rearRightMotor.setDutyCycle((0.05f + rearRightMult * 0.05f) * rearRightMult);
+
 		}
 	}
 
 	public void takePicture(){
 		mCamera.takePicture(null, null, null, new PhotoHandler());
-	}
-	
-	@Override
-	protected void onStop() {
-		super.onStop();
 	}
 
 	@Override
@@ -204,24 +266,79 @@ public class QuadController extends IOIOActivity {
 		preview.changeResolution();
 	}
 	
-	public void setJoystickPos(int x1, int y1, int x2, int y2){
+	public void setJoystickPos(int x1, final int y1, int x2, int y2){
 		this.x1 = x1;
 		this.y1 = y1;
 		this.x2 = x2;
 		this.y2 = y2;
+		
+		if(y1 <= -53)
+			//go up
+			direction = 2;
+		else if(y1 >= 51)
+			//go down
+			direction = 3;
+		else
+			//hover
+			direction = 1;
+		
+		//
+		Log.d("Command Receiver", "Joystick command received: " + "x1:" + (this.x1) + " y1:" + ((this.y1) + " x2:" + (this.x2) + " y2:" + (this.y2)));
+		QuadController._varField.post(new Runnable() {
+            public void run() {
+            	_varField.setText((0.05f + (y1/100f) * 0.05f)+"");
+            }
+        });
 	}
 	
-	public void setGyroValues(float x, float y, float z){
-		this.gyroX = x;
-		this.gyroY = y;
-		this.gyroZ = z;
+	public void setRotation(float[] rotationVector){
+		calculateAngles(quadRotation, rotationVector);
 	}
 	
-	public void setAccelValues(float x, float y, float z){
-		this.accelX = x;
-		this.accelY = y;
-		this.accelZ = z;
+	/**
+	 * Credit to maxlukichev from http://androbotus.wordpress.com/
+	 * 
+	 * @param result the array of Euler angles in the order: yaw, roll, pitch
+	 * @param rVector the rotation vector
+	 */
+	public void calculateAngles(float[] result, float[] rVector){
+	    //caculate rotation matrix from rotation vector first
+	    SensorManager.getRotationMatrixFromVector(tempRMatrix, rVector);
+	    
+	    //translate rotation matrix according to the new orientation of the device
+	    SensorManager.remapCoordinateSystem(tempRMatrix, SensorManager.AXIS_MINUS_X, SensorManager.AXIS_Y, rMatrix);
+	 
+	    //calculate Euler angles now
+	    SensorManager.getOrientation(rMatrix, result);
+	 
+	    //The results are in radians, need to convert it to degrees
+	    convertToDegrees(result);
 	}
+	 
+	private void convertToDegrees(float[] vector){
+	    for (int i = 0; i < vector.length; i++){
+	        vector[i] = Math.round(Math.toDegrees(vector[i]));
+	    }
+	}
+	
+	@Override
+    protected void onStop() {
+        super.onStop();
+    }
+	
+	@Override
+    protected void onDestroy() {
+        super.onStop();
+        mCamera.release();
+        Log.d("ControllerDestroy", "INSIDE: onDestroy");
+        receiveCommandThread.stopThread();
+        sendVideoThread.stopThread();
+    }
+	
+	@Override
+    protected void onResume() {
+        super.onResume();
+    }
 
 	/**
 	 * @return the mCamera

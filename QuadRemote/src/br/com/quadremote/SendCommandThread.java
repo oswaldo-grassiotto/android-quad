@@ -16,17 +16,21 @@ import android.util.Log;
 public class SendCommandThread extends Thread {
 	
 	private byte[] commandBytes;
-	private DatagramSocket socket;
 	
+	private final DatagramSocket SOCKET;
 	private final InetAddress SERVER_ADDRESS;
 	private final int SERVER_PORT = 6774;
 	private final QuadRemote MAIN_ACTIVITY;
 	
+	private boolean run = true;
+	
 	public SendCommandThread(QuadRemote mainActivity) throws SocketException, UnknownHostException{
 		this.MAIN_ACTIVITY = mainActivity;
 		
-		this.SERVER_ADDRESS = InetAddress.getByName("192.168.43.201");
-		this.socket = new DatagramSocket(SERVER_PORT);
+		//this.SERVER_ADDRESS = InetAddress.getByName("192.168.43.201");
+		this.SERVER_ADDRESS = InetAddress.getByName("192.168.1.106");
+		this.SOCKET = new DatagramSocket(SERVER_PORT);
+		SOCKET.setSoTimeout(4000);
 	}
 	
 	public void setCommandBytes(byte[] commandBytes){
@@ -35,18 +39,20 @@ public class SendCommandThread extends Thread {
 	
 	@Override
 	public void run() {
-		try{
-			while(true){
+		run = true;
+		
+		while(run){
+			try{
 				if(commandBytes != null){
 					Log.d("Command Sender", "Sending command: "  + ((int) commandBytes[0]));
 					DatagramPacket packet = new DatagramPacket(commandBytes, commandBytes.length, SERVER_ADDRESS, SERVER_PORT);
-					socket.send(packet);
+					SOCKET.send(packet);
 					
 					if(((int) commandBytes[0]) == 4){
 						//if we've requested a list of available resolutions, read it
 						byte[] resolutionsData = new byte[100];
 						DatagramPacket resolutionsPacket = new DatagramPacket(resolutionsData, resolutionsData.length);
-						socket.receive(resolutionsPacket);
+						SOCKET.receive(resolutionsPacket);
 						resolutionsData = resolutionsPacket.getData();
 						String resolutionsStr = new String(resolutionsData, "UTF-8").trim();
 						Log.d("Command Sender", "Data received: " + resolutionsStr);
@@ -55,11 +61,20 @@ public class SendCommandThread extends Thread {
 					
 					commandBytes = null;
 				}
-				
-				
+			} catch (Exception e) {
+				Log.e("Command Sender", "Error in command " + commandBytes[0], e);
+				commandBytes = null;
 			}
-		} catch (Exception e) {
-			Log.e("Command Sender", e.getMessage());
+			
 		}
+	}
+	
+	public void stopThread(){
+		run = false;
+		this.SOCKET.close();
+	}
+
+	public boolean getRun() {
+		return run;
 	}
 }

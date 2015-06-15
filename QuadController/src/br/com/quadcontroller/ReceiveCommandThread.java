@@ -1,6 +1,5 @@
 package br.com.quadcontroller;
 
-import java.math.BigDecimal;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -19,24 +18,27 @@ import android.util.Log;
 class ReceiveCommandThread extends Thread {
 
 	private final int SERVER_PORT;
-	private final DatagramSocket socket;
+	private final DatagramSocket SOCKET;
 	
 	private final QuadController MAIN_ACTIVITY;
+	
+	private boolean run = true;
 	
 	public ReceiveCommandThread(QuadController mainActivity) throws SocketException {
 		this.MAIN_ACTIVITY = mainActivity;
 		
 		SERVER_PORT = 6774;
-		this.socket = new DatagramSocket(SERVER_PORT);
+		this.SOCKET = new DatagramSocket(SERVER_PORT);
 	}
 	
 	@Override
 	public void run() {
-		while (true) {
+		run = true;
+		while (run) {
 			try {
 				byte[] commandBytes = new byte[9];
 				DatagramPacket packet = new DatagramPacket(commandBytes, commandBytes.length);
-				socket.receive(packet);
+				SOCKET.receive(packet);
 
 				byte[] data = packet.getData();
 
@@ -48,7 +50,7 @@ class ReceiveCommandThread extends Thread {
 					case 0:
 						//We received a joystick (move) command
 						MAIN_ACTIVITY.setJoystickPos((int) data[1], (int) data[2], (int) data[3], (int) data[4]);
-						Log.d("Command Receiver", "Joystick command received: " + "x1:" + ((int) data[1]) + " y1:" + ((int) data[2]) + " x2:" + ((int) data[3]) + "y2:" + ((int) data[4]));
+						//Log.d("Command Receiver", "Joystick command received: " + "x1:" + ((int) data[1]) + " y1:" + ((int) data[2]) + " x2:" + ((int) data[3]) + "y2:" + ((int) data[4]));
 						break;
 					case 1:
 						//We received a take picture command
@@ -67,7 +69,7 @@ class ReceiveCommandThread extends Thread {
 						DatagramPacket resolutionsPacket = new DatagramPacket(resolutionsData, resolutionsData.length, 
 								InetAddress.getByName("192.168.43.1"), 6774);
 						Log.d("Command Receiver", "Sending list: " + new String(resolutionsData, "UTF-8"));
-						socket.send(resolutionsPacket);
+						SOCKET.send(resolutionsPacket);
 						break;
 					case 5:
 						//we received a change resolution command
@@ -87,5 +89,14 @@ class ReceiveCommandThread extends Thread {
 				Log.e("Command Receiver Body", e.getMessage());
 			}
 		}
+	}
+	
+	public void stopThread(){
+		run = false;
+		this.SOCKET.close();
+	}
+
+	public boolean getRun() {
+		return run;
 	}
 }

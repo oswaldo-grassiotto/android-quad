@@ -30,7 +30,7 @@ public class QuadRemote extends Activity {
 	private String currentResolution;
 	
 	//User interface variables
-	private TextView mTextview;
+	public static TextView mTextview;
 	public static TextView mTextview2;
 	private ImageView iv;
 	private Joystick joy1;
@@ -52,7 +52,7 @@ public class QuadRemote extends Activity {
 		setContentView(R.layout.main);
 		
 		activity = this;
-		
+		Log.e("gg","aaaa");
 		//Retrieve and store UI elements for later usage
 		mTextview = (TextView) findViewById(R.id.textView1);
 		mTextview2 = (TextView) findViewById(R.id.textView2);
@@ -135,6 +135,7 @@ public class QuadRemote extends Activity {
 				System.arraycopy(currentResolutionBytes, 0, commandBytes, 1, currentResolutionBytes.length);
 				break;
 			default:
+				
 				int x1 = joy1.getxAxis();
 				int y1 = joy1.getyAxis();
 				int x2 = joy2.getxAxis();
@@ -145,7 +146,7 @@ public class QuadRemote extends Activity {
 				commandBytes[3] = (byte) x2;
 				commandBytes[4] = (byte) y2;
 		}
-		
+		Log.d("", "Sending " + commandBytes);
 		sendCommandThread.setCommandBytes(commandBytes);
 	}
 	
@@ -183,6 +184,24 @@ public class QuadRemote extends Activity {
     	this.supportedResolutions = resolutions;
     }
 
+    @Override
+    protected void onStop() {
+        super.onStop();
+    }
+	
+	@Override
+    protected void onDestroy() {
+        super.onStop();
+        Log.d("RemoteDestroy", "INSIDE: onStop");
+        receiveVideoThread.stopThread();
+        sendCommandThread.stopThread();
+    }
+	
+	@Override
+    protected void onResume() {
+        super.onResume();
+    }
+    
 	/**
 	 * @return the supportedResolutions
 	 */

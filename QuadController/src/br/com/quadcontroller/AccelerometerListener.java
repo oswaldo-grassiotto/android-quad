@@ -25,6 +25,6 @@ public class AccelerometerListener implements SensorEventListener {
 		float y = event.values[1];
 		float z = event.values[2];
 		
-		MAIN_ACTIVITY.setAccelValues(x, y, z);
+		//MAIN_ACTIVITY.setAccelValues(x, y, z);
 	}
 }

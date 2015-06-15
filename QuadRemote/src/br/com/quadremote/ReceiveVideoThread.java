@@ -22,25 +22,28 @@ class ReceiveVideoThread extends Thread {
 	private final int DATA_MAX_SIZE = 491;
 	private final int HEADER_SIZE = 5;
 	private final int SERVER_PORT = 6775;
+	private final DatagramSocket SOCKET;
 	
 	private int current_frame = 0;
 	private int slicesStored = 0;
 	private byte[] imageData;
-	private DatagramSocket socket;
+	
 	
 	private Handler handler;
 	private final ImageView iv;
+	
+	private boolean run = true;
 	
 	public ReceiveVideoThread(Handler handler, ImageView iv) throws SocketException {
 		this.handler = handler;
 		this.iv = iv;
 		
-		this.socket = new DatagramSocket(SERVER_PORT);
+		this.SOCKET = new DatagramSocket(SERVER_PORT);
 	}
 	
 	public void run() {
-		
-		while (true) {	
+		run = true;
+		while (run) {	
 			
 			/*try {
 				String ip = InetAddress.getLocalHost().getHostAddress();
@@ -55,7 +58,7 @@ class ReceiveVideoThread extends Thread {
 				DatagramPacket packet = null;
 				byte[] receivedData = new byte[496];
 				packet = new DatagramPacket(receivedData, 496);
-				socket.receive(packet);
+				SOCKET.receive(packet);
 				
 				byte[] data = packet.getData();         
 	            
@@ -97,5 +100,14 @@ class ReceiveVideoThread extends Thread {
                 Log.e(TAG, e.getMessage());
             }               
 		}
+	}
+	
+	public void stopThread(){
+		run = false;
+		this.SOCKET.close();
+	}
+
+	public boolean getRun() {
+		return run;
 	}
 }

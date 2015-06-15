@@ -11,10 +11,16 @@ import android.view.View;
   
 public class Joystick extends View {  
     
-	private Point pontoFinal, pontoMeio = null;  
+	private Point currentPoint = null; 
+	private Point midPoint = null;  
     private Paint paint;  
-    private int larg = getWidth();  
-    private int alt = getHeight();
+    private int width = getWidth();  
+    private int height = getHeight();
+    
+    private float positionScale = 3.575f; //Used to set the joystick axis range to [0-100]
+    private float midPointScale = positionScale * 2; //Used to get the midpoint of the axis in the [0-100] range
+    
+    private boolean[] holdMode = {false, false}; //If this is true the value of the specified axis (x,y) won't return to the center when the pad is released
     
     private final QuadRemote MAIN_ACTIVITY;
   
@@ -24,32 +30,35 @@ public class Joystick extends View {
         
         this.MAIN_ACTIVITY = (QuadRemote) context;
         		
-        pontoFinal = new Point(larg/2, alt/2);
+        currentPoint = new Point(width/2, height/2);
         
-        iniciarPaint();
-        setarListener();
+        initializePaint();
+        setListener();
     }  
       
-    public void iniciarPaint(){  
+    public void initializePaint(){  
         paint = new Paint();  
-        paint.setStrokeWidth(2); //Seta a "grossura" do Paint  
+        paint.setStrokeWidth(2);
     }  
       
     @SuppressLint("DrawAllocation")  
     @Override  
     protected void onDraw(Canvas canvas)  
     {  
-        if(pontoMeio == null){  
-            larg = getWidth();  
-            alt = getHeight();  
+        if(midPoint == null){  
+            width = getWidth();  
+            height = getHeight();  
           
-            pontoMeio = new Point(larg/2, alt/2);  
+            midPoint = new Point((int)(width/midPointScale), (int)(height/midPointScale));
         }  
         
         super.onDraw(canvas);  
     }  
-      
-    public void setarListener(){  
+    
+    /**
+     * Creates listeners to read and store the positions of the x and y axis.
+     */
+    public void setListener(){  
         setOnTouchListener(new View.OnTouchListener() {  
               
             @Override  
@@ -60,21 +69,33 @@ public class Joystick extends View {
                 	float eventX = event.getX();
                 	float eventY = event.getY();
                 	
-                	if( eventX >= 0 && eventX <= larg)
-                		pontoFinal.x = (int)eventX;
+                	if( eventX >= 0 && eventX <= width)
+                		currentPoint.x = ((int)(eventX/3.575));
                     
-                	if( eventY >= 0 && eventY <= alt){
-                		pontoFinal.y = (int)eventY;
-                		MAIN_ACTIVITY.mTextview2.setText("y:" + event.getY());
+                	if( eventY >= 0 && eventY <= height){
+                		currentPoint.y = ((int)(eventY/3.575));
+                		currentPoint.y = (currentPoint.y * -1) - 100;    //Invert y values so 0 is the bottom of the pad and 100 is the top
                 	}
                 	
+                	MAIN_ACTIVITY.mTextview2.setText("y:" + currentPoint.y);
+            		MAIN_ACTIVITY.mTextview.setText("x:" + currentPoint.x);
                     
                     invalidate();
                     
 					MAIN_ACTIVITY.sendCommand(0);
                     
                 } else if(event.getAction() == MotionEvent.ACTION_UP){  
-                    pontoFinal.set(pontoMeio.x, pontoMeio.y);  
+                	currentPoint.set(midPoint.x, midPoint.y);
+                	
+                	if(!holdMode[0])
+                		currentPoint.x = midPoint.x;
+                	
+                	if(!holdMode[1])
+                		currentPoint.y = midPoint.y;
+                	
+                	MAIN_ACTIVITY.mTextview.setText("x:" + currentPoint.x);
+                	MAIN_ACTIVITY.mTextview2.setText("y:" + currentPoint.y);
+                	
                     invalidate();
                     
                     MAIN_ACTIVITY.sendCommand(0);
@@ -85,54 +106,20 @@ public class Joystick extends View {
     }  
       
     /**
-     * Retorna o valor do eixo X.
+     * Returns the position of the X axis. 0 means left and 100 means right
      * 
-     * valores negativos significam que a posicao atual esta na parte
-     * esquerda do joystick.
-     * 
-     * @return
+     * @return an integer number in the range [0-100]
      */
     public int getxAxis(){  
-        int ret = 0;  
-          
-        if(pontoFinal.x > 0 && pontoFinal.x < larg){  
-            ret = pontoFinal.x - pontoMeio.x;  
-        }  
-          
-        if(pontoFinal.x > larg){  
-            ret = larg/2;  
-        }  
-          
-        if(pontoFinal.x < 0){  
-            ret = 0-(larg/2);  
-        }  
-          
-        return ret;  
+        return currentPoint.x;  
     }  
       
     /**
-     * Retorna o valor da posicao do eixo Y.
+     * Returns the position of the Y axis. 0 means up and 100 means down
      * 
-     * valores negativos significam que a posicao atual esta na parte
-     * superior do joystick.
-     * 
-     * @return
+     * @return an integer number in the range [0-100]
      */
     public int getyAxis(){  
-        int ret = 0;  
-          
-        if(pontoFinal.y > 0 && pontoFinal.y < alt){  
-            ret = pontoFinal.y - pontoMeio.y;  
-        }  
-          
-        if(pontoFinal.y > alt){  
-            ret = alt/2;  
-        }  
-          
-        if(pontoFinal.y < 0){  
-            ret = 0-(alt/2);  
-        }  
-          
-        return ret;  
+        return currentPoint.y;  
     }  
 } 
